@@ -22,10 +22,10 @@ from functools import reduce
 class SVM (BaseEstimator):
 
     def __init__(self,
-                 c=10.0,
-                 loop = 1000,
-                 tol = 1e-2,
-                 eps = 1e-2):
+                 c=10000,
+                 loop=1000,
+                 tol=1e-2,
+                 eps=1e-2):
 
         self._c = c
         self._loop = loop
@@ -65,61 +65,66 @@ class SVM (BaseEstimator):
         # why
         eta = 2 * k12 - k11 - k22
 
-        #if eta > 0:
+        # if eta > 0:
         #    print('eta > 0')
         #    return False
 
-        if eta < 0:
-            print('eta =',eta)
-            # 一点目の更新処理とクリッピング
-            print('一点目の更新処理とクリッピング')
-            a2 = alph2 - y2 * (e1 - e2) / eta
-            print('y2 * (e1 - e2) / eta', y2 * (e1 - e2) / eta)
+        if eta > 0:
+            return False
 
-            if a2 < L:
-                a2 = L
-            elif a2 > H:
-                a2 = H
-        else:
-            print('カーネルが正定値でない場合の処理')
-            # カーネルが正定値でない場合の処理
-            a1 = self._alpha[i1]
-            a2 = self._alpha[i2]
-            v1 = self.one_predict(
-                self._x_vs[i1]) - self._b - y1 * a1 * k11 - y2 * a2 * k12
-            v2 = self.one_predict(
-                self._x_vs[i2]) - self._b - y1 * a1 * k12 - y2 * a2 * k22
-            Wconst = 0
-            for i in range(n):
-                if i != i1 and i != i2:
-                    Wconst += a[i1]
-            for i in range(n):
-                for j in range(n):
-                    if i != i1 and i != i2 and j != i1 and j != i2:
-                        Wconst += self.y[i] * self.y[j] * \
-                            self._gaussian_kernel(self._x_vs[i], self._x_vs[j]) * a[i] * a[j] / 2.0
+        #print('eta =', eta)
+        # 一点目の更新処理とクリッピング
 
-            a2 = L
-            a1 = y1 * self._alpha[i1] + y2 * self._alpha[i2] - y2 * L
-            Lobj = a1 + a2 - k11 * a1 * a1 / 2 - k22 * a2 * a2 / 2 - s * \
-                k12 * a1 * a2 / 2 - y1 * a1 * v1 - y2 * a2 * v2 + Wconst
+        a2 = alph2 - y2 * (e1 - e2) / eta
+        #print('y2 * (e1 - e2) / eta', y2 * (e1 - e2) / eta)
 
-            a2 = H
-            a1 = y1 * self._alpha[i1] + y2 * self._alpha[i2] - y2 * H
-            Hobj = a1 + a2 - k11 * a1 * a1 / 2 - k22 * a2 * a2 / 2 - s * \
-                k12 * a1 * a2 / 2 - y1 * a1 * v1 - y2 * a2 * v2 + Wconst
+        # if a2 < L:
+        #    a2 = L
+        # elif a2 > H:
+        #    a2 = H
 
-            if Lobj > Hobj + self._eps:
-                a2 = L
-            elif Lobj > Hobj - self._eps:
-                a2 = H
-            else:
-                a2 = alph2
+        a2 = min(H, max(a2, L))
 
-        if a2 < 1e-8:
-            a2 = 0
-        elif a2 > self._c - 1e-8:
-            a2 = self._c
+        # else:
+        #    print('カーネルが正定値でない場合の処理')
+        #    # カーネルが正定値でない場合の処理
+        #    a1 = self._alpha[i1]
+        #    a2 = self._alpha[i2]
+        #    v1 = self.one_predict(
+        #        self._x_vs[i1]) - self._b - y1 * a1 * k11 - y2 * a2 * k12
+        #    v2 = self.one_predict(
+        #        self._x_vs[i2]) - self._b - y1 * a1 * k12 - y2 * a2 * k22
+        #    Wconst = 0
+        #    for i in range(n):
+        #        if i != i1 and i != i2:
+        #            Wconst += a[i1]
+        #    for i in range(n):
+        #        for j in range(n):
+        #            if i != i1 and i != i2 and j != i1 and j != i2:
+        #                Wconst += self._y[i] * self._y[j] * \
+        #                    self._gaussian_kernel(self._x_vs[i], self._x_vs[j]) * a[i] * a[j] / 2.0
+        #
+        #    a2 = L
+        #    a1 = y1 * self._alpha[i1] + y2 * self._alpha[i2] - y2 * L
+        #    Lobj = a1 + a2 - k11 * a1 * a1 / 2 - k22 * a2 * a2 / 2 - s * \
+        #        k12 * a1 * a2 / 2 - y1 * a1 * v1 - y2 * a2 * v2 + Wconst
+        #
+        #    a2 = H
+        #    a1 = y1 * self._alpha[i1] + y2 * self._alpha[i2] - y2 * H
+        #    Hobj = a1 + a2 - k11 * a1 * a1 / 2 - k22 * a2 * a2 / 2 - s * \
+        #        k12 * a1 * a2 / 2 - y1 * a1 * v1 - y2 * a2 * v2 + Wconst
+        #
+        #    if Lobj > Hobj + self._eps:
+        #        a2 = L
+        #    elif Lobj > Hobj - self._eps:
+        #        a2 = H
+        #    else:
+        #        a2 = alph2
+        #
+        # if a2 < 1e-8:
+        #    a2 = 0
+        # elif a2 > (self._c - 1e-8):
+        #    a2 = self._c
 
         if abs(a2 - alph2) < self._eps * (a2 + alph2 + self._eps):
             print('a2 =', a2, ' alph2 =', alph2)
@@ -128,26 +133,30 @@ class SVM (BaseEstimator):
 
         a1 = alph1 + s * (alph2 - a2)
 
-        b_old = self._b
-        b1 = e1 + y1 * (a1 - self._alpha[i1]) * \
-            k11 + y2 * (a2 - self._alpha[i2]) * k12 + self._b
-        b2 = e2 + y1 * (a1 - self._alpha[i1]) * \
-            k12 + y2 * (a2 - self._alpha[i2]) * k22 + self._b
+        #b_old = self._b
+        # b1 = e1 + y1 * (a1 - self._alpha[i1]) * \
+        #    k11 + y2 * (a2 - self._alpha[i2]) * k12 + self._b
+        # b2 = e2 + y1 * (a1 - self._alpha[i1]) * \
+        #    k12 + y2 * (a2 - self._alpha[i2]) * k22 + self._b
 
-        if b1 == b2:
-            self._b = b1
-        else:
-            self._b = (b1 + b2) / 2
+        # if b1 == b2:
+        #    self._b = b1
+        # else:
+        #    self._b = (b1 + b2) / 2
 
         # update error chache using new lagrange multipliers
 
         da1 = a1 - self._alpha[i1]
         da2 = a2 - self._alpha[i2]
 
-        for i in range(len(self._x_vs)):
-            self._e[i] = self._e[i] + y1 * da1 * \
-                self._gaussian_kernel(self._x_vs[i1], self._x_vs[i]) + y2 * da2 * \
-                self._gaussian_kernel(self._x_vs[i2], self._x_vs[i]) + b_old - self._b
+        # for i in range(len(self._x_vs)):
+        #    self._e[i] = self._e[i] + y1 * da1 * \
+        #        self._gaussian_kernel(self._x_vs[i1], self._x_vs[i]) + y2 * da2 * \
+        #        self._gaussian_kernel(self._x_vs[i2], self._x_vs[i]) + b_old - self._b
+
+        self._e += np.array([(da1 * self._y[i1] * self._gaussian_kernel(self._x_vs[i1], x) +
+                              da2 * self._y[i2] * self._gaussian_kernel(self._x_vs[i2], x))
+                             for x in self._x_vs])
 
         # store a1, a2 in the alpha array
         self._alpha[i1] = a1
@@ -157,21 +166,20 @@ class SVM (BaseEstimator):
 
     def _search(self, i, lst):
         if self._e[i] >= 0:
-            return reduce(lambda j, k : j if self._e[j] < self._e[k] else k, lst)
+            return reduce(lambda j, k: j if self._e[j] < self._e[k] else k, lst)
         else:
             return reduce(lambda j, k: j if self._e[j] > self._e[k] else k, lst)
-
 
     def _examine_example(self, i2):
         y2 = self._y[i2]
         alph2 = self._alpha[i2]
         e2 = self._e[i2]
         r2 = e2 * y2
-        i1 = 0
+        #i1 = 0
 
         if (r2 < -self._tol and alph2 < self._c) or (r2 > self._tol and alph2 > 0):
             alst1 = [i for i in range(len(self._alpha))
-                     if 0 <self._alpha[i] < self._c]
+                     if 0 < self._alpha[i] < self._c]
 
             if alst1:
                 i1 = self._search(i2, alst1)
@@ -208,10 +216,10 @@ class SVM (BaseEstimator):
         for i in self._m:
             self._b += self._y[i]
             for j in self._s:
-                self._b -= (self._alpha[j]*self._y[j]*self._gaussian_kernel(self._x_vs[i], self._x_vs[j]))
+                self._b -= (self._alpha[j] * self._y[j] *
+                            self._gaussian_kernel(self._x_vs[i], self._x_vs[j]))
 
         self._b /= len(self._m)
-
 
     def fit(self, X, y):
         self._y = y
@@ -242,20 +250,20 @@ class SVM (BaseEstimator):
             elif not changed:
                 examine_all = True
 
-        print('hoo')
+        #print('hoo')
         self._calc_b()
 
     def one_predict(self, x_v):
         tmp = 0
         for i in range(len(self._x_vs)):
-            tmp += self._alpha[i] * self._y[i] * _gaussian_kernel(x_v, self._x_vs[i])
+            tmp += self._alpha[i] * self._y[i] * \
+                self._gaussian_kernel(x_v, self._x_vs[i])
         return tmp - self._b
-
 
 
 def main():
 
-    svm = SVM(c = 50)
+    svm = SVM(c=10000)
 
     db_name = 'australian'
     data_set = fetch_mldata(db_name)
@@ -266,7 +274,7 @@ def main():
 
     svm.fit(X_train, y_train)
 
-    re = np.array([ svm.one_predict(x) for x in X_test])
+    re = np.array([svm.one_predict(x) for x in X_test])
 
     print(sum([r == y for r, y in zip(re, y_test)]) / len(y_test))
 
