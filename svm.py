@@ -20,176 +20,102 @@ from functools import reduce
 
 
 class SVM (BaseEstimator):
+    """
+    Support Vector Machine
+    using SMO Algorithm.
+    """
 
     def __init__(self,
+                 kernel=lambda x,y:np.dot(x,y),
                  c=10000,
-                 loop=1000,
                  tol=1e-2,
-                 eps=1e-2):
-
+                 eps=1e-2,
+                 loop=float('inf')):
+        """
+        Arguments:
+        - `kernel`: カーネル関数
+        - `c`: パラメータ
+        - `tol`: KKT条件の許容する誤差
+        - `eps`: αの許容する誤差
+        - `loop`: ループの上限
+        """
+        self._kernel = kernel
         self._c = c
-        self._loop = loop
         self._tol = tol
         self._eps = eps
+        self._loop = loop
 
-    def _gaussian_kernel(self, x_v1, x_v2, delta=1.0):
-        return np.exp(- (np.linalg.norm(x_v1 - x_v2) ** 2) / (2 * delta**2))
 
-    def _take_step(self, i1, i2):
-
+    def _takeStep(self, i1, i2):
         if i1 == i2:
             return False
-
         alph1 = self._alpha[i1]
         alph2 = self._alpha[i2]
-        y1 = self._y[i1]
-        y2 = self._y[i2]
+        y1 = self._target[i1]
+        y2 = self._target[i2]
         e1 = self._e[i1]
         e2 = self._e[i2]
         s = y1 * y2
 
         if y1 != y2:
             L = max(0, alph2 - alph1)
-            H = min(self._c, self._c - alph1 + alph2)
+            H = min(self._c, self._c-alph1+alph2)
         else:
             L = max(0, alph2 + alph1 - self._c)
-            H = min(self._c, alph1 + alph2)
+            H = min(self._c, alph1+alph2)
 
         if L == H:
             return False
 
-        k11 = self._gaussian_kernel(self._x_vs[i1], self._x_vs[i1])
-        k12 = self._gaussian_kernel(self._x_vs[i1], self._x_vs[i2])
-        k22 = self._gaussian_kernel(self._x_vs[i2], self._x_vs[i2])
-
-        # why
+        k11 = self._kernel(self._point[i1], self._point[i1])
+        k12 = self._kernel(self._point[i1], self._point[i2])
+        k22 = self._kernel(self._point[i2], self._point[i2])
         eta = 2 * k12 - k11 - k22
-
-        # if eta > 0:
-        #    print('eta > 0')
-        #    return False
-
         if eta > 0:
             return False
 
-        #print('eta =', eta)
-        # 一点目の更新処理とクリッピング
-
         a2 = alph2 - y2 * (e1 - e2) / eta
-        #print('y2 * (e1 - e2) / eta', y2 * (e1 - e2) / eta)
-
-        # if a2 < L:
-        #    a2 = L
-        # elif a2 > H:
-        #    a2 = H
 
         a2 = min(H, max(a2, L))
 
-        # else:
-        #    print('カーネルが正定値でない場合の処理')
-        #    # カーネルが正定値でない場合の処理
-        #    a1 = self._alpha[i1]
-        #    a2 = self._alpha[i2]
-        #    v1 = self.one_predict(
-        #        self._x_vs[i1]) - self._b - y1 * a1 * k11 - y2 * a2 * k12
-        #    v2 = self.one_predict(
-        #        self._x_vs[i2]) - self._b - y1 * a1 * k12 - y2 * a2 * k22
-        #    Wconst = 0
-        #    for i in range(n):
-        #        if i != i1 and i != i2:
-        #            Wconst += a[i1]
-        #    for i in range(n):
-        #        for j in range(n):
-        #            if i != i1 and i != i2 and j != i1 and j != i2:
-        #                Wconst += self._y[i] * self._y[j] * \
-        #                    self._gaussian_kernel(self._x_vs[i], self._x_vs[j]) * a[i] * a[j] / 2.0
-        #
-        #    a2 = L
-        #    a1 = y1 * self._alpha[i1] + y2 * self._alpha[i2] - y2 * L
-        #    Lobj = a1 + a2 - k11 * a1 * a1 / 2 - k22 * a2 * a2 / 2 - s * \
-        #        k12 * a1 * a2 / 2 - y1 * a1 * v1 - y2 * a2 * v2 + Wconst
-        #
-        #    a2 = H
-        #    a1 = y1 * self._alpha[i1] + y2 * self._alpha[i2] - y2 * H
-        #    Hobj = a1 + a2 - k11 * a1 * a1 / 2 - k22 * a2 * a2 / 2 - s * \
-        #        k12 * a1 * a2 / 2 - y1 * a1 * v1 - y2 * a2 * v2 + Wconst
-        #
-        #    if Lobj > Hobj + self._eps:
-        #        a2 = L
-        #    elif Lobj > Hobj - self._eps:
-        #        a2 = H
-        #    else:
-        #        a2 = alph2
-        #
-        # if a2 < 1e-8:
-        #    a2 = 0
-        # elif a2 > (self._c - 1e-8):
-        #    a2 = self._c
-
         if abs(a2 - alph2) < self._eps * (a2 + alph2 + self._eps):
-            print('a2 =', a2, ' alph2 =', alph2)
-            print('abs(a2 - alph2) = ', abs(a2 - alph2))
             return False
-
         a1 = alph1 + s * (alph2 - a2)
 
-        #b_old = self._b
-        # b1 = e1 + y1 * (a1 - self._alpha[i1]) * \
-        #    k11 + y2 * (a2 - self._alpha[i2]) * k12 + self._b
-        # b2 = e2 + y1 * (a1 - self._alpha[i1]) * \
-        #    k12 + y2 * (a2 - self._alpha[i2]) * k22 + self._b
+        # update
+        da1 = a1 - alph1
+        da2 = a2 - alph2
 
-        # if b1 == b2:
-        #    self._b = b1
-        # else:
-        #    self._b = (b1 + b2) / 2
+        self._e += np.array([(da1 * self._target[i1] * self._kernel(self._point[i1], p) +
+                           da2 * self._target[i2] * self._kernel(self._point[i2], p))
+                          for p in self._point])
 
-        # update error chache using new lagrange multipliers
-
-        da1 = a1 - self._alpha[i1]
-        da2 = a2 - self._alpha[i2]
-
-        # for i in range(len(self._x_vs)):
-        #    self._e[i] = self._e[i] + y1 * da1 * \
-        #        self._gaussian_kernel(self._x_vs[i1], self._x_vs[i]) + y2 * da2 * \
-        #        self._gaussian_kernel(self._x_vs[i2], self._x_vs[i]) + b_old - self._b
-
-        self._e += np.array([(da1 * self._y[i1] * self._gaussian_kernel(self._x_vs[i1], x) +
-                              da2 * self._y[i2] * self._gaussian_kernel(self._x_vs[i2], x))
-                             for x in self._x_vs])
-
-        # store a1, a2 in the alpha array
         self._alpha[i1] = a1
         self._alpha[i2] = a2
-
         return True
 
     def _search(self, i, lst):
         if self._e[i] >= 0:
-            return reduce(lambda j, k: j if self._e[j] < self._e[k] else k, lst)
+            return reduce(lambda j,k: j if self._e[j] < self._e[k] else k, lst)
         else:
-            return reduce(lambda j, k: j if self._e[j] > self._e[k] else k, lst)
+            return reduce(lambda j,k: j if self._e[j] > self._e[k] else k, lst)
 
-    def _examine_example(self, i2):
-        y2 = self._y[i2]
+    def _examinEx(self, i2):
+        y2 = self._target[i2]
         alph2 = self._alpha[i2]
         e2 = self._e[i2]
-        r2 = e2 * y2
-        #i1 = 0
-
-        if (r2 < -self._tol and alph2 < self._c) or (r2 > self._tol and alph2 > 0):
+        r2 = e2*y2
+        if ((r2 < -self._tol and alph2 < self._c) or
+            (r2 > self._tol and alph2 > 0)):
             alst1 = [i for i in range(len(self._alpha))
                      if 0 < self._alpha[i] < self._c]
-
             if alst1:
                 i1 = self._search(i2, alst1)
-                if self._take_step(i1, i2):
+                if self._takeStep(i1, i2):
                     return True
-
                 random.shuffle(alst1)
-
                 for i1 in alst1:
-                    if self._take_step(i1, i2):
+                    if self._takeStep(i1, i2):
                         return True
 
             alst2 = [i for i in range(len(self._alpha))
@@ -197,9 +123,8 @@ class SVM (BaseEstimator):
                          self._alpha[i] >= self._c)]
 
             random.shuffle(alst2)
-
             for i1 in alst2:
-                if self._take_step(i1, i2):
+                if self._takeStep(i1, i2):
                     return True
 
             self._calc_b()
@@ -207,59 +132,57 @@ class SVM (BaseEstimator):
         return False
 
     def _calc_b(self):
-        self._s = [i for i in range(len(self._y))
+        self._s = [i for i in range(len(self._target))
                    if 0 < self._alpha[i]]
-        self._m = [i for i in range(len(self._y))
+        self._m = [i for i in range(len(self._target))
                    if 0 < self._alpha[i] < self._c]
-
         self._b = 0.0
         for i in self._m:
-            self._b += self._y[i]
+            self._b += self._target[i]
             for j in self._s:
-                self._b -= (self._alpha[j] * self._y[j] *
-                            self._gaussian_kernel(self._x_vs[i], self._x_vs[j]))
-
+                self._b -= (self._alpha[j]*self._target[j]*
+                            self._kernel(self._point[i], self._point[j]))
         self._b /= len(self._m)
 
-    def fit(self, X, y):
-        self._y = y
-        self._x_vs = X
-        self._alpha = np.zeros(len(y), dtype=float)
+    def one_predict(self, x):
+        ret = self._b
+        for i in self._s:
+            ret += (self._alpha[i]*self._target[i]*
+                    self._kernel(x, self._point[i]))
+        return ret
+
+    def fit(self, point, target):
+        self._target = target
+        self._point = point
+
+        self._alpha = np.zeros(len(target), dtype=float)
         self._b = 0
-        self._e = -1 * np.array(y, dtype=float)
+        self._e = -1*np.array(target, dtype=float)
         changed = False
         examine_all = True
         count = 0
 
         while changed or examine_all:
             count += 1
-            print(count)
-
             if count > self._loop:
                 break
 
             changed = False
 
             if examine_all:
-                for i in range(len(self._y)):
-                    changed |= self._examine_example(i)
+                for i in range(len(self._target)):
+                    changed |= self._examinEx(i)
+            else:
+                for i in (j for j in range(len(self._target))
+                          if 0 < self._alpha[j] < self._c):
+                    changed |= self._examinEx(i)
 
             if examine_all:
                 examine_all = False
-
             elif not changed:
                 examine_all = True
 
-        #print('hoo')
         self._calc_b()
-
-    def one_predict(self, x_v):
-        tmp = 0
-        for i in range(len(self._x_vs)):
-            tmp += self._alpha[i] * self._y[i] * \
-                self._gaussian_kernel(x_v, self._x_vs[i])
-        return tmp - self._b
-
 
 def main():
 
