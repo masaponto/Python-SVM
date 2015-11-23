@@ -164,6 +164,7 @@ class SVM (BaseEstimator):
 
         while changed or examine_all:
             count += 1
+            print(count)
             if count > self._loop:
                 break
 
@@ -186,7 +187,7 @@ class SVM (BaseEstimator):
 
 def main():
 
-    svm = SVM(c=10000)
+    svm = SVM(c=10000, loop = 1000)
 
     db_name = 'australian'
     data_set = fetch_mldata(db_name)
