@@ -149,7 +149,7 @@ class SVM (BaseEstimator):
         for i in self._s:
             ret += (self._alpha[i]*self._target[i]*
                     self._kernel(x, self._point[i]))
-        return ret
+        return np.sign(ret)
 
     def fit(self, point, target):
         self._target = target
@@ -187,7 +187,7 @@ class SVM (BaseEstimator):
 
 def main():
 
-    svm = SVM(c=10000, loop = 1000)
+    svm = SVM(c=100, loop = 20)
 
     db_name = 'australian'
     data_set = fetch_mldata(db_name)
@@ -199,6 +199,8 @@ def main():
     svm.fit(X_train, y_train)
 
     re = np.array([svm.one_predict(x) for x in X_test])
+
+    print(re)
 
     print(sum([r == y for r, y in zip(re, y_test)]) / len(y_test))
 
