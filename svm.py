@@ -14,12 +14,12 @@ import random
 from sklearn import preprocessing
 from sklearn.base import BaseEstimator
 from sklearn.datasets import fetch_mldata
-from sklearn import cross_validation
 from sklearn.datasets import load_svmlight_file
+from sklearn import cross_validation
 from functools import reduce
 
 
-class SVM (BaseEstimator):
+class SVM(BaseEstimator):
     """
     Support Vector Machine
     using SMO Algorithm.
@@ -39,11 +39,11 @@ class SVM (BaseEstimator):
         - `eps`: αの許容する誤差
         - `loop`: ループの上限
         """
-        self._kernel = kernel
-        self._c = c
-        self._tol = tol
-        self._eps = eps
-        self._loop = loop
+        self.kernel = kernel
+        self.c = c
+        self.tol = tol
+        self.eps = eps
+        self.loop = loop
 
 
     def _takeStep(self, i1, i2):
@@ -59,17 +59,17 @@ class SVM (BaseEstimator):
 
         if y1 != y2:
             L = max(0, alph2 - alph1)
-            H = min(self._c, self._c-alph1+alph2)
+            H = min(self.c, self.c-alph1+alph2)
         else:
-            L = max(0, alph2 + alph1 - self._c)
-            H = min(self._c, alph1+alph2)
+            L = max(0, alph2 + alph1 - self.c)
+            H = min(self.c, alph1+alph2)
 
         if L == H:
             return False
 
-        k11 = self._kernel(self._point[i1], self._point[i1])
-        k12 = self._kernel(self._point[i1], self._point[i2])
-        k22 = self._kernel(self._point[i2], self._point[i2])
+        k11 = self.kernel(self._point[i1], self._point[i1])
+        k12 = self.kernel(self._point[i1], self._point[i2])
+        k22 = self.kernel(self._point[i2], self._point[i2])
         eta = 2 * k12 - k11 - k22
         if eta > 0:
             return False
@@ -78,7 +78,7 @@ class SVM (BaseEstimator):
 
         a2 = min(H, max(a2, L))
 
-        if abs(a2 - alph2) < self._eps * (a2 + alph2 + self._eps):
+        if abs(a2 - alph2) < self.eps * (a2 + alph2 + self.eps):
             return False
         a1 = alph1 + s * (alph2 - a2)
 
@@ -86,8 +86,8 @@ class SVM (BaseEstimator):
         da1 = a1 - alph1
         da2 = a2 - alph2
 
-        self._e += np.array([(da1 * self._target[i1] * self._kernel(self._point[i1], p) +
-                           da2 * self._target[i2] * self._kernel(self._point[i2], p))
+        self._e += np.array([(da1 * self._target[i1] * self.kernel(self._point[i1], p) +
+                           da2 * self._target[i2] * self.kernel(self._point[i2], p))
                           for p in self._point])
 
         self._alpha[i1] = a1
@@ -105,10 +105,10 @@ class SVM (BaseEstimator):
         alph2 = self._alpha[i2]
         e2 = self._e[i2]
         r2 = e2*y2
-        if ((r2 < -self._tol and alph2 < self._c) or
-            (r2 > self._tol and alph2 > 0)):
+        if ((r2 < -self.tol and alph2 < self.c) or
+            (r2 > self.tol and alph2 > 0)):
             alst1 = [i for i in range(len(self._alpha))
-                     if 0 < self._alpha[i] < self._c]
+                     if 0 < self._alpha[i] < self.c]
             if alst1:
                 i1 = self._search(i2, alst1)
                 if self._takeStep(i1, i2):
@@ -120,7 +120,7 @@ class SVM (BaseEstimator):
 
             alst2 = [i for i in range(len(self._alpha))
                      if (self._alpha[i] <= 0 or
-                         self._alpha[i] >= self._c)]
+                         self._alpha[i] >= self.c)]
 
             random.shuffle(alst2)
             for i1 in alst2:
@@ -135,37 +135,44 @@ class SVM (BaseEstimator):
         self._s = [i for i in range(len(self._target))
                    if 0 < self._alpha[i]]
         self._m = [i for i in range(len(self._target))
-                   if 0 < self._alpha[i] < self._c]
+                   if 0 < self._alpha[i] < self.c]
         self._b = 0.0
         for i in self._m:
             self._b += self._target[i]
             for j in self._s:
                 self._b -= (self._alpha[j]*self._target[j]*
-                            self._kernel(self._point[i], self._point[j]))
+                            self.kernel(self._point[i], self._point[j]))
         self._b /= len(self._m)
 
     def one_predict(self, x):
         ret = self._b
         for i in self._s:
             ret += (self._alpha[i]*self._target[i]*
-                    self._kernel(x, self._point[i]))
+                    self.kernel(x, self._point[i]))
         return np.sign(ret)
 
-    def fit(self, point, target):
-        self._target = target
-        self._point = point
+    def predict(self, X):
+        return np.array(list(map(self.one_predict, X)))
 
-        self._alpha = np.zeros(len(target), dtype=float)
+    def fit(self, X, y):
+        self._target = y
+        self._point = X
+
+        self._alpha = np.zeros(len(y), dtype=float)
         self._b = 0
-        self._e = -1*np.array(target, dtype=float)
+        self._e = -1*np.array(y, dtype=float)
         changed = False
         examine_all = True
         count = 0
 
+
+        print(self.loop, self.c, self.eps)
+
+
         while changed or examine_all:
             count += 1
-            print(count)
-            if count > self._loop:
+
+            if count > self.loop:
                 break
 
             changed = False
@@ -175,7 +182,7 @@ class SVM (BaseEstimator):
                     changed |= self._examinEx(i)
             else:
                 for i in (j for j in range(len(self._target))
-                          if 0 < self._alpha[j] < self._c):
+                          if 0 < self._alpha[j] < self.c):
                     changed |= self._examinEx(i)
 
             if examine_all:
@@ -185,9 +192,21 @@ class SVM (BaseEstimator):
 
         self._calc_b()
 
-def main():
 
-    svm = SVM(c=100, loop = 20)
+#def cross_val():
+#    db_names = ['australian']
+#
+#    for db_name in db_names:
+#        print(db_name)
+#        data_set = fetch_mldata(db_name)
+#        data_set.data = preprocessing.scale(data_set.data)
+#        svm = SVM(c=100, loop=20)
+#        scores = cross_validation.cross_val_score(svm, data_set.data, data_set.target, cv=5, scoring='accuracy')
+#        print("Accuracy: %0.3f " % (scores.mean()))
+#
+
+def test():
+    svm = SVM(c=100, loop=20)
 
     db_name = 'australian'
     data_set = fetch_mldata(db_name)
@@ -198,12 +217,14 @@ def main():
 
     svm.fit(X_train, y_train)
 
-    re = np.array([svm.one_predict(x) for x in X_test])
+    re = svm.predict(X_test)
 
-    print(re)
+    print("Accuracy: %0.3f " % (sum([r == y for r, y in zip(re, y_test)]) / len(y_test) ))
 
-    print(sum([r == y for r, y in zip(re, y_test)]) / len(y_test))
 
+def main():
+    #cross_val()
+    test()
 
 if __name__ == "__main__":
     main()
