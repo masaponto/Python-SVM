@@ -26,7 +26,7 @@ class SVM(BaseEstimator):
     """
 
     def __init__(self,
-                 kernel=lambda x,y:np.dot(x,y),
+                 kernels=lambda x,y:np.dot(x,y),
                  c=10000,
                  tol=1e-2,
                  eps=1e-2,
@@ -39,7 +39,7 @@ class SVM(BaseEstimator):
         - `eps`: αの許容する誤差
         - `loop`: ループの上限
         """
-        self.kernel = kernel
+        self.kernels = kernels
         self.c = c
         self.tol = tol
         self.eps = eps
@@ -49,12 +49,12 @@ class SVM(BaseEstimator):
     def _takeStep(self, i1, i2):
         if i1 == i2:
             return False
-        alph1 = self._alpha[i1]
-        alph2 = self._alpha[i2]
-        y1 = self._target[i1]
-        y2 = self._target[i2]
-        e1 = self._e[i1]
-        e2 = self._e[i2]
+        alph1 = self.alpha[i1]
+        alph2 = self.alpha[i2]
+        y1 = self.target[i1]
+        y2 = self.target[i2]
+        e1 = self.e[i1]
+        e2 = self.e[i2]
         s = y1 * y2
 
         if y1 != y2:
@@ -67,9 +67,9 @@ class SVM(BaseEstimator):
         if L == H:
             return False
 
-        k11 = self.kernel(self._point[i1], self._point[i1])
-        k12 = self.kernel(self._point[i1], self._point[i2])
-        k22 = self.kernel(self._point[i2], self._point[i2])
+        k11 = self.kernels(self.point[i1], self.point[i1])
+        k12 = self.kernels(self.point[i1], self.point[i2])
+        k22 = self.kernels(self.point[i2], self.point[i2])
         eta = 2 * k12 - k11 - k22
         if eta > 0:
             return False
@@ -86,29 +86,29 @@ class SVM(BaseEstimator):
         da1 = a1 - alph1
         da2 = a2 - alph2
 
-        self._e += np.array([(da1 * self._target[i1] * self.kernel(self._point[i1], p) +
-                           da2 * self._target[i2] * self.kernel(self._point[i2], p))
-                          for p in self._point])
+        self.e += np.array([(da1 * self.target[i1] * self.kernels(self.point[i1], p) +
+                           da2 * self.target[i2] * self.kernels(self.point[i2], p))
+                          for p in self.point])
 
-        self._alpha[i1] = a1
-        self._alpha[i2] = a2
+        self.alpha[i1] = a1
+        self.alpha[i2] = a2
         return True
 
     def _search(self, i, lst):
-        if self._e[i] >= 0:
-            return reduce(lambda j,k: j if self._e[j] < self._e[k] else k, lst)
+        if self.e[i] >= 0:
+            return reduce(lambda j,k: j if self.e[j] < self.e[k] else k, lst)
         else:
-            return reduce(lambda j,k: j if self._e[j] > self._e[k] else k, lst)
+            return reduce(lambda j,k: j if self.e[j] > self.e[k] else k, lst)
 
     def _examinEx(self, i2):
-        y2 = self._target[i2]
-        alph2 = self._alpha[i2]
-        e2 = self._e[i2]
+        y2 = self.target[i2]
+        alph2 = self.alpha[i2]
+        e2 = self.e[i2]
         r2 = e2*y2
         if ((r2 < -self.tol and alph2 < self.c) or
             (r2 > self.tol and alph2 > 0)):
-            alst1 = [i for i in range(len(self._alpha))
-                     if 0 < self._alpha[i] < self.c]
+            alst1 = [i for i in range(len(self.alpha))
+                     if 0 < self.alpha[i] < self.c]
             if alst1:
                 i1 = self._search(i2, alst1)
                 if self._takeStep(i1, i2):
@@ -118,9 +118,9 @@ class SVM(BaseEstimator):
                     if self._takeStep(i1, i2):
                         return True
 
-            alst2 = [i for i in range(len(self._alpha))
-                     if (self._alpha[i] <= 0 or
-                         self._alpha[i] >= self.c)]
+            alst2 = [i for i in range(len(self.alpha))
+                     if (self.alpha[i] <= 0 or
+                         self.alpha[i] >= self.c)]
 
             random.shuffle(alst2)
             for i1 in alst2:
@@ -132,42 +132,38 @@ class SVM(BaseEstimator):
         return False
 
     def _calc_b(self):
-        self._s = [i for i in range(len(self._target))
-                   if 0 < self._alpha[i]]
-        self._m = [i for i in range(len(self._target))
-                   if 0 < self._alpha[i] < self.c]
-        self._b = 0.0
-        for i in self._m:
-            self._b += self._target[i]
-            for j in self._s:
-                self._b -= (self._alpha[j]*self._target[j]*
-                            self.kernel(self._point[i], self._point[j]))
-        self._b /= len(self._m)
+        self.s = [i for i in range(len(self.target))
+                   if 0 < self.alpha[i]]
+        self.m = [i for i in range(len(self.target))
+                   if 0 < self.alpha[i] < self.c]
+        self.b = 0.0
+        for i in self.m:
+            self.b += self.target[i]
+            for j in self.s:
+                self.b -= (self.alpha[j]*self.target[j]*
+                            self.kernels(self.point[i], self.point[j]))
+        self.b /= len(self.m)
 
     def one_predict(self, x):
-        ret = self._b
-        for i in self._s:
-            ret += (self._alpha[i]*self._target[i]*
-                    self.kernel(x, self._point[i]))
+        ret = self.b
+        for i in self.s:
+            ret += (self.alpha[i]*self.target[i]*
+                    self.kernels(x, self.point[i]))
         return np.sign(ret)
 
     def predict(self, X):
         return np.array(list(map(self.one_predict, X)))
 
     def fit(self, X, y):
-        self._target = y
-        self._point = X
+        self.target = y
+        self.point = X
 
-        self._alpha = np.zeros(len(y), dtype=float)
-        self._b = 0
-        self._e = -1*np.array(y, dtype=float)
+        self.alpha = np.zeros(len(y), dtype=float)
+        self.b = 0
+        self.e = -1*np.array(y, dtype=float)
         changed = False
         examine_all = True
         count = 0
-
-
-        print(self.loop, self.c, self.eps)
-
 
         while changed or examine_all:
             count += 1
@@ -178,11 +174,11 @@ class SVM(BaseEstimator):
             changed = False
 
             if examine_all:
-                for i in range(len(self._target)):
+                for i in range(len(self.target)):
                     changed |= self._examinEx(i)
             else:
-                for i in (j for j in range(len(self._target))
-                          if 0 < self._alpha[j] < self.c):
+                for i in (j for j in range(len(self.target))
+                          if 0 < self.alpha[j] < self.c):
                     changed |= self._examinEx(i)
 
             if examine_all:
@@ -193,17 +189,17 @@ class SVM(BaseEstimator):
         self._calc_b()
 
 
-#def cross_val():
-#    db_names = ['australian']
-#
-#    for db_name in db_names:
-#        print(db_name)
-#        data_set = fetch_mldata(db_name)
-#        data_set.data = preprocessing.scale(data_set.data)
-#        svm = SVM(c=100, loop=20)
-#        scores = cross_validation.cross_val_score(svm, data_set.data, data_set.target, cv=5, scoring='accuracy')
-#        print("Accuracy: %0.3f " % (scores.mean()))
-#
+def cross_val():
+    db_names = ['australian']
+
+    for db_name in db_names:
+        print(db_name)
+        data_set = fetch_mldata(db_name)
+        data_set.data = preprocessing.scale(data_set.data)
+        svm = SVM(c=100, loop=20)
+        scores = cross_validation.cross_val_score(svm, data_set.data, data_set.target, cv=5, scoring='accuracy')
+        print("Accuracy: %0.3f " % (scores.mean()))
+
 
 def test():
     svm = SVM(c=100, loop=20)
@@ -223,8 +219,8 @@ def test():
 
 
 def main():
-    #cross_val()
-    test()
+    cross_val()
+    #test()
 
 if __name__ == "__main__":
     main()
