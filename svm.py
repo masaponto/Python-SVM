@@ -47,8 +47,10 @@ class SVM(BaseEstimator):
 
 
     def _takeStep(self, i1, i2):
+
         if i1 == i2:
             return False
+
         alph1 = self.alpha[i1]
         alph2 = self.alpha[i2]
         y1 = self.target[i1]
@@ -80,6 +82,7 @@ class SVM(BaseEstimator):
 
         if abs(a2 - alph2) < self.eps * (a2 + alph2 + self.eps):
             return False
+
         a1 = alph1 + s * (alph2 - a2)
 
         # update
@@ -92,6 +95,7 @@ class SVM(BaseEstimator):
 
         self.alpha[i1] = a1
         self.alpha[i2] = a2
+
         return True
 
     def _search(self, i, lst):
