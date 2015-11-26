@@ -33,11 +33,11 @@ class SVM(BaseEstimator):
                  loop=float('inf')):
         """
         Arguments:
-        - `kernel`: カーネル関数
-        - `c`: パラメータ
-        - `tol`: KKT条件の許容する誤差
-        - `eps`: αの許容する誤差
-        - `loop`: ループの上限
+        - kernel: カーネル関数
+        - c: パラメータ
+        - tol: KKT条件の許容する誤差
+        - eps: αの許容する誤差
+        - loop: ループの上限
         """
         self.kernels = kernels
         self.c = c
@@ -73,16 +73,19 @@ class SVM(BaseEstimator):
         k12 = self.kernels(self.point[i1], self.point[i2])
         k22 = self.kernels(self.point[i2], self.point[i2])
         eta = 2 * k12 - k11 - k22
+
         if eta > 0:
             return False
 
+        # 1点目 if eta < 0
         a2 = alph2 - y2 * (e1 - e2) / eta
-
         a2 = min(H, max(a2, L))
 
+        # 変化量が微小の場合、変更を行わない
         if abs(a2 - alph2) < self.eps * (a2 + alph2 + self.eps):
             return False
 
+        # 2点目
         a1 = alph1 + s * (alph2 - a2)
 
         # update
@@ -177,6 +180,7 @@ class SVM(BaseEstimator):
 
             changed = False
 
+            # 1点目の選択
             if examine_all:
                 for i in range(len(self.target)):
                     changed |= self._examinEx(i)
